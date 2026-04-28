@@ -1,7 +1,10 @@
+# Gas Town runtime (polecat worktree artifacts)
 .beads/
 .claude/
 .runtime/
 embeddeddolt/
 CLAUDE.md
+
+# Nix build outputs
 result
 result-*
