@@ -1,5 +1,7 @@
 # gastown.nix
 
+__WARNING: This is vibe coded using gastown for my own learning. DO NOT USE.__
+
 Declarative Gas Town rig and crew configuration using the Nix module system.
 
 ## Usage
