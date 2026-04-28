@@ -2,4 +2,6 @@
 .claude/
 .runtime/
 embeddeddolt/
+CLAUDE.md
 result
+result-*
