@@ -41,8 +41,7 @@ single-rig setups where the project itself hosts the configuration.
     # rig.rigSettings  - rig settings.json derivation
     # rig.crewConfigs  - per-member config.json derivations
     # rig.configDir    - combined directory tree
-    # rig.activate     - script to write configs into GT_ROOT
-    # rig.mayorAttach  - script to activate .gt/ and run gt mayor attach
+    # rig.mayorAttach  - script to manage full GT lifecycle (up/attach/down)
     apps.mayorAttach = {
       type = "app";
       program = "${rig.mayorAttach}/bin/gt-mayor-attach";
@@ -61,9 +60,15 @@ single-rig setups where the project itself hosts the configuration.
 | `modules` | list | no | Extra NixOS-style modules |
 | `config` | attrset | no | Inline configuration |
 
-`mayorAttach` discovers the project root via `git rev-parse`, writes
-generated configs into `.gt/`, creates crew state, and runs
-`gt mayor attach`.
+`mayorAttach` manages the full Gas Town lifecycle in a single command:
+1. Discovers the project root via `git rev-parse`
+2. Writes generated configs into `.gt/`
+3. Runs `gt install` to initialize the GT directory structure
+4. Runs `gt up` to start all services (Dolt, daemon, agents, etc.)
+5. Runs `gt mayor attach` (blocks until detach with Ctrl-B D)
+6. Runs `gt down` on exit to tear down all services
+
+A trap ensures `gt down` runs even on unexpected exit.
 
 ## Pure evaluation
 
@@ -80,15 +85,6 @@ cfg = gastown-nix.lib.evalRig {
 };
 # cfg.name         => "my-project"
 # cfg.mayorCrew    => "alice" (auto-selected, single crew member)
-```
-
-## Activation
-
-The `activate` output is a script that writes generated configs into a
-Gas Town directory:
-
-```bash
-GT_ROOT=~/my-project/.gt nix run .#activate
 ```
 
 ## Rig options

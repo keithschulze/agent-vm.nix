@@ -79,8 +79,8 @@ in
     doEval ([ { config = config; } ] ++ modules);
 
   # Create a standalone rig with generated derivations.
-  # Returns config, JSON file derivations, a combined configDir, an
-  # activation script, and a mayorAttach script.
+  # Returns config, JSON file derivations, a combined configDir,
+  # and a mayorAttach script that manages the full GT lifecycle.
   mkRig =
     {
       pkgs,
@@ -146,23 +146,6 @@ in
         )}
       '';
 
-      activate = pkgs.writeShellScriptBin "gt-activate" ''
-        set -euo pipefail
-        GT_ROOT="''${GT_ROOT:-.}"
-        echo "Activating rig ${rigName} at $GT_ROOT"
-
-        mkdir -p "$GT_ROOT/settings"
-        install -m 644 ${rigsJsonFile} "$GT_ROOT/rigs.json"
-        install -m 644 ${settingsJsonFile} "$GT_ROOT/settings/config.json"
-
-        mkdir -p "$GT_ROOT/${rigName}"
-        install -m 644 ${rigConfigFile} "$GT_ROOT/${rigName}/config.json"
-
-        ${crewActivations}
-
-        echo "Done."
-      '';
-
       mayorAttach =
         let
           crewMember = cfg.mayorCrew;
@@ -208,9 +191,20 @@ in
           STATE
           fi
 
-          # 5. cd to crew dir and exec gt mayor attach
+          # 5. Initialize GT directory structure
+          ${gtPackage}/bin/gt install "$GT_ROOT" --force --no-beads
+
+          # 6. Ensure gt down runs on exit (detach, signal, error)
+          cleanup() { ${gtPackage}/bin/gt down; }
+          trap cleanup EXIT
+
+          # 7. Start services (Dolt, daemon, deacon, mayor, witnesses, refineries)
+          ${gtPackage}/bin/gt up
+
+          # 8. Attach to mayor session (blocks until detach with Ctrl-B D)
           cd "$CREW_DIR"
-          exec ${gtPackage}/bin/gt mayor attach
+          ${gtPackage}/bin/gt mayor attach
+          # cleanup runs automatically via trap
         '';
     };
 }
