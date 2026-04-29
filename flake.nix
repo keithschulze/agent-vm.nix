@@ -424,7 +424,7 @@
 
       templates.default = {
         path = ./templates/default;
-        description = "Gas Town project configuration using flake-utils";
+        description = "Embeddable Gas Town rig configuration";
       };
     };
 }
