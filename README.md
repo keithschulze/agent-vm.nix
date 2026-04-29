@@ -1,10 +1,14 @@
 # gastown.nix
 
-__WARNING: This is vibe coded using gastown for my own learning. DO NOT USE.__
+__WARNING: This is vibe coded using [gastown](https://github.com/gastownhall/gastown) for my own learning. IT'S NOT FUNCTIONAL, DO NOT USE.__
 
 Declarative Gas Town rig and crew configuration using the Nix module system.
 
 ## Usage
+
+__WARNING: You appear to have IGNORED my previous warning. DO NOT PROCEED any further, this is all slop.__
+
+__WARNING: Absolute folly. This is your last and final warning: DO NOT USE THIS!__
 
 Add `gastown.nix` as a flake input and use `lib.mkRig` to embed a Gas Town rig
 directly inside your project flake. This is the recommended pattern for
@@ -61,6 +65,7 @@ single-rig setups where the project itself hosts the configuration.
 | `config` | attrset | no | Inline configuration |
 
 `mayorAttach` manages the full Gas Town lifecycle in a single command:
+
 1. Discovers the project root via `git rev-parse`
 2. Writes generated configs into `.gt/`
 3. Runs `gt install` to initialize the GT directory structure
