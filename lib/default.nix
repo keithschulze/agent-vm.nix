@@ -60,15 +60,8 @@ let
     default_agent = settings.defaultAgent;
   };
 
-  # Shared evaluation logic
-  doEval = modules:
-    (evalModules {
-      modules = [ ../modules/town.nix ] ++ modules;
-      specialArgs = { inherit lib; };
-    }).config;
-
   # Shared evaluation logic for standalone rig
-  doEvalRig = modules:
+  doEval = modules:
     (evalModules {
       modules = [ ../modules/standalone.nix ] ++ modules;
       specialArgs = { inherit lib; };
@@ -76,132 +69,14 @@ let
 
 in
 {
-  # Evaluate town configuration (pure, no pkgs required).
-  # Returns the evaluated config attrset.
-  evalTown =
-    {
-      modules ? [ ],
-      config ? { },
-    }:
-    doEval ([ { config = config; } ] ++ modules);
-
-  # Create a town with generated derivations.
-  # Returns config, JSON file derivations, a combined configDir, and an
-  # activation script.
-  mkTown =
-    {
-      pkgs,
-      modules ? [ ],
-      config ? { },
-    }:
-    let
-      cfg = doEval ([ { config = config; } ] ++ modules);
-
-      rigsJsonFile = pkgs.writeText "rigs.json" (builtins.toJSON {
-        version = 1;
-        rigs = mapAttrs rigToRegistryEntry cfg.rigs;
-      });
-
-      settingsJsonFile = pkgs.writeText "town-settings.json" (
-        builtins.toJSON (settingsToConfig cfg.settings)
-      );
-
-      rigConfigFiles = mapAttrs (
-        name: rigCfg:
-        pkgs.writeText "${name}-config.json" (builtins.toJSON (rigToConfig name rigCfg))
-      ) cfg.rigs;
-
-      rigSettingsFiles = mapAttrs (
-        name: rigCfg:
-        pkgs.writeText "${name}-settings.json" (builtins.toJSON (rigToSettings rigCfg))
-      ) cfg.rigs;
-
-      crewConfigFiles = mapAttrs (
-        rigName: rigCfg:
-        mapAttrs (
-          memberName: memberCfg:
-          pkgs.writeText "${rigName}-crew-${memberName}-config.json" (
-            builtins.toJSON (crewMemberToConfig memberName memberCfg)
-          )
-        ) rigCfg.crew
-      ) cfg.rigs;
-
-      rigActivations = concatStringsSep "\n" (
-        mapAttrsToList (
-          name: rigCfg:
-          let
-            crewSetup = concatStringsSep "\n" (
-              mapAttrsToList (member: _memberCfg: ''
-                mkdir -p "$GT_ROOT/${name}/crew/${member}"
-                install -m 644 ${crewConfigFiles.${name}.${member}} "$GT_ROOT/${name}/crew/${member}/config.json"
-              '') rigCfg.crew
-            );
-          in
-          ''
-            echo "  rig: ${name}"
-            mkdir -p "$GT_ROOT/${name}"
-            install -m 644 ${rigConfigFiles.${name}} "$GT_ROOT/${name}/config.json"
-            ${crewSetup}
-          ''
-        ) cfg.rigs
-      );
-
-    in
-    {
-      config = cfg;
-
-      # Individual config file derivations
-      rigsJson = rigsJsonFile;
-      settingsJson = settingsJsonFile;
-      rigConfigs = rigConfigFiles;
-      rigSettings = rigSettingsFiles;
-      crewConfigs = crewConfigFiles;
-
-      # All config files combined into a directory tree
-      configDir = pkgs.runCommand "gt-config" { } (
-        ''
-          mkdir -p $out/settings
-          cp ${rigsJsonFile} $out/rigs.json
-          cp ${settingsJsonFile} $out/settings/config.json
-        ''
-        + concatStringsSep "\n" (
-          mapAttrsToList (name: rigCfg: ''
-            mkdir -p $out/${name}
-            cp ${rigConfigFiles.${name}} $out/${name}/config.json
-          ''
-          + concatStringsSep "\n" (
-            mapAttrsToList (memberName: _memberCfg: ''
-              mkdir -p $out/${name}/crew/${memberName}
-              cp ${crewConfigFiles.${name}.${memberName}} $out/${name}/crew/${memberName}/config.json
-            '') rigCfg.crew
-          )) cfg.rigs
-        )
-      );
-
-      # Activation script: writes generated configs into a Gas Town root
-      activate = pkgs.writeShellScriptBin "gt-activate" ''
-        set -euo pipefail
-        GT_ROOT="''${GT_ROOT:-.}"
-        echo "Activating Gas Town configuration at $GT_ROOT"
-
-        mkdir -p "$GT_ROOT/settings"
-        install -m 644 ${rigsJsonFile} "$GT_ROOT/rigs.json"
-        install -m 644 ${settingsJsonFile} "$GT_ROOT/settings/config.json"
-
-        ${rigActivations}
-
-        echo "Done."
-      '';
-    };
-
-  # Evaluate standalone rig configuration (pure, no pkgs required).
+  # Evaluate rig configuration (pure, no pkgs required).
   # Returns the evaluated config attrset.
   evalRig =
     {
       modules ? [ ],
       config ? { },
     }:
-    doEvalRig ([ { config = config; } ] ++ modules);
+    doEval ([ { config = config; } ] ++ modules);
 
   # Create a standalone rig with generated derivations.
   # Returns config, JSON file derivations, a combined configDir, an
@@ -215,7 +90,7 @@ in
       config ? { },
     }:
     let
-      cfg = doEvalRig ([ { config = config; } ] ++ modules);
+      cfg = doEval ([ { config = config; } ] ++ modules);
       rigName = cfg.name;
 
       rigsJsonFile = pkgs.writeText "rigs.json" (builtins.toJSON {

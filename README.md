@@ -6,136 +6,9 @@ Declarative Gas Town rig and crew configuration using the Nix module system.
 
 ## Usage
 
-Add `gastown.nix` as a flake input and use `lib.mkTown` to declare your
-town topology:
-
-```nix
-{
-  inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    gastown-nix.url = "github:keithschulze/gastown.nix";
-  };
-
-  outputs = { nixpkgs, gastown-nix, ... }:
-  let
-    pkgs = nixpkgs.legacyPackages.x86_64-linux;
-
-    town = gastown-nix.lib.mkTown {
-      inherit pkgs;
-      config = {
-        settings.defaultAgent = "claude";
-
-        rigs.my-project = {
-          gitUrl = "git@github.com:org/project.git";
-          defaultBranch = "main";
-          beads.prefix = "mp";
-          maxPolecats = 5;
-          crew.alice = {
-            role = "developer";
-            githubUsername = "alice-gh";
-          };
-          crew.bob = {
-            role = "reviewer";
-          };
-        };
-
-        rigs.infra = {
-          gitUrl = "git@github.com:org/infra.git";
-          beads.prefix = "if";
-          autoStartOnUp = true;
-        };
-      };
-    };
-  in {
-    # town.config       - evaluated configuration
-    # town.rigsJson      - rigs.json derivation
-    # town.settingsJson  - settings/config.json derivation
-    # town.rigConfigs    - per-rig config.json derivations
-    # town.rigSettings   - per-rig operational settings derivations
-    # town.configDir     - combined directory tree
-    # town.activate      - script to write configs into a Gas Town root
-  };
-}
-```
-
-### With flake-utils
-
-Use [flake-utils](https://github.com/numtide/flake-utils) to generate
-outputs for all supported systems without manual `legacyPackages` plumbing:
-
-```nix
-{
-  inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    flake-utils.url = "github:numtide/flake-utils";
-    gastown-nix.url = "github:keithschulze/gastown.nix";
-  };
-
-  outputs = { nixpkgs, flake-utils, gastown-nix, ... }:
-  flake-utils.lib.eachDefaultSystem (system:
-    let
-      pkgs = nixpkgs.legacyPackages.${system};
-
-      town = gastown-nix.lib.mkTown {
-        inherit pkgs;
-        config = {
-          settings.defaultAgent = "claude";
-
-          rigs.my-project = {
-            gitUrl = "git@github.com:org/project.git";
-            defaultBranch = "main";
-            beads.prefix = "mp";
-            maxPolecats = 5;
-            crew.alice = {
-              role = "developer";
-              githubUsername = "alice-gh";
-            };
-            crew.bob = {
-              role = "reviewer";
-            };
-          };
-        };
-      };
-    in {
-      packages.activate = town.activate;
-      packages.configDir = town.configDir;
-    }
-  );
-}
-```
-
-This produces `packages.<system>.activate` and `packages.<system>.configDir`
-for each system (`x86_64-linux`, `aarch64-linux`, `x86_64-darwin`,
-`aarch64-darwin`).
-
-## Pure evaluation
-
-Use `evalTown` when you only need the evaluated config without derivations:
-
-```nix
-cfg = gastown-nix.lib.evalTown {
-  config.rigs.my-project = {
-    gitUrl = "git@github.com:org/project.git";
-    beads.prefix = "mp";
-  };
-};
-# cfg.rigs.my-project.maxPolecats => 10 (default)
-```
-
-## Activation
-
-The `activate` output is a script that writes generated configs into a
-Gas Town directory:
-
-```bash
-GT_ROOT=~/my-town nix run .#activate
-```
-
-## Standalone rig (mkRig / evalRig)
-
-Use `mkRig` to embed a Gas Town rig directly inside a project flake. This is
-the recommended pattern for single-rig setups where the project itself hosts
-the configuration.
+Add `gastown.nix` as a flake input and use `lib.mkRig` to embed a Gas Town rig
+directly inside your project flake. This is the recommended pattern for
+single-rig setups where the project itself hosts the configuration.
 
 ```nix
 {
@@ -192,7 +65,7 @@ the configuration.
 generated configs into `.gt/`, creates crew state, and runs
 `gt mayor attach`.
 
-### Pure evaluation
+## Pure evaluation
 
 Use `evalRig` when you only need the evaluated config without derivations:
 
@@ -209,10 +82,20 @@ cfg = gastown-nix.lib.evalRig {
 # cfg.mayorCrew    => "alice" (auto-selected, single crew member)
 ```
 
+## Activation
+
+The `activate` output is a script that writes generated configs into a
+Gas Town directory:
+
+```bash
+GT_ROOT=~/my-project/.gt nix run .#activate
+```
+
 ## Rig options
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
+| `name` | string | *required* | Rig name, used as the directory under GT_ROOT |
 | `gitUrl` | string | *required* | Git URL for the rig's repository |
 | `defaultBranch` | string | `"main"` | Default branch name |
 | `beads.prefix` | string | *required* | Issue ID prefix |
@@ -223,16 +106,9 @@ cfg = gastown-nix.lib.evalRig {
 | `dnd` | bool | `false` | Do Not Disturb mode |
 | `polecatBranchTemplate` | string or null | `null` | Custom polecat branch naming |
 | `priorityAdjustment` | int | `0` | Priority offset for dispatch |
-| `crew` | attrsOf { role, githubUsername, email } | `{}` | Crew member definitions |
-
-### Standalone rig options
-
-These options are available only when using `mkRig` / `evalRig`:
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `name` | string | *required* | Rig name, used as the directory under GT_ROOT |
 | `mayorCrew` | string or null | `null` | Which crew member `mayorAttach` uses (auto-selected when exactly one crew member) |
+| `defaultAgent` | string | `"claude"` | Default agent type |
+| `crew` | attrsOf { role, githubUsername, email } | `{}` | Crew member definitions |
 
 ## Running checks
 
