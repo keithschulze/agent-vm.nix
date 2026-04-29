@@ -67,6 +67,13 @@ let
       specialArgs = { inherit lib; };
     }).config;
 
+  # Shared evaluation logic for standalone rig
+  doEvalRig = modules:
+    (evalModules {
+      modules = [ ../modules/standalone.nix ] ++ modules;
+      specialArgs = { inherit lib; };
+    }).config;
+
 in
 {
   # Evaluate town configuration (pure, no pkgs required).
@@ -185,5 +192,146 @@ in
 
         echo "Done."
       '';
+    };
+
+  # Evaluate standalone rig configuration (pure, no pkgs required).
+  # Returns the evaluated config attrset.
+  evalRig =
+    {
+      modules ? [ ],
+      config ? { },
+    }:
+    doEvalRig ([ { config = config; } ] ++ modules);
+
+  # Create a standalone rig with generated derivations.
+  # Returns config, JSON file derivations, a combined configDir, an
+  # activation script, and a mayorAttach script.
+  mkRig =
+    {
+      pkgs,
+      gtPackage,
+      bdPackage ? null,
+      modules ? [ ],
+      config ? { },
+    }:
+    let
+      cfg = doEvalRig ([ { config = config; } ] ++ modules);
+      rigName = cfg.name;
+
+      rigsJsonFile = pkgs.writeText "rigs.json" (builtins.toJSON {
+        version = 1;
+        rigs.${rigName} = rigToRegistryEntry rigName cfg;
+      });
+
+      settingsJsonFile = pkgs.writeText "town-settings.json" (
+        builtins.toJSON (settingsToConfig { defaultAgent = "claude"; })
+      );
+
+      rigConfigFile = pkgs.writeText "${rigName}-config.json" (
+        builtins.toJSON (rigToConfig rigName cfg)
+      );
+
+      rigSettingsFile = pkgs.writeText "${rigName}-settings.json" (
+        builtins.toJSON (rigToSettings cfg)
+      );
+
+      crewConfigFileSet = mapAttrs (
+        memberName: memberCfg:
+        pkgs.writeText "${rigName}-crew-${memberName}-config.json" (
+          builtins.toJSON (crewMemberToConfig memberName memberCfg)
+        )
+      ) cfg.crew;
+
+      crewActivations = concatStringsSep "\n" (
+        mapAttrsToList (member: _memberCfg: ''
+          mkdir -p "$GT_ROOT/${rigName}/crew/${member}"
+          install -m 644 ${crewConfigFileSet.${member}} "$GT_ROOT/${rigName}/crew/${member}/config.json"
+        '') cfg.crew
+      );
+
+    in
+    {
+      config = cfg;
+
+      rigConfig = rigConfigFile;
+      rigSettings = rigSettingsFile;
+      crewConfigs = crewConfigFileSet;
+
+      configDir = pkgs.runCommand "gt-rig-config" { } ''
+        mkdir -p $out/settings
+        cp ${rigsJsonFile} $out/rigs.json
+        cp ${settingsJsonFile} $out/settings/config.json
+        mkdir -p $out/${rigName}
+        cp ${rigConfigFile} $out/${rigName}/config.json
+        ${concatStringsSep "\n" (
+          mapAttrsToList (memberName: _memberCfg: ''
+            mkdir -p $out/${rigName}/crew/${memberName}
+            cp ${crewConfigFileSet.${memberName}} $out/${rigName}/crew/${memberName}/config.json
+          '') cfg.crew
+        )}
+      '';
+
+      activate = pkgs.writeShellScriptBin "gt-activate" ''
+        set -euo pipefail
+        GT_ROOT="''${GT_ROOT:-.}"
+        echo "Activating rig ${rigName} at $GT_ROOT"
+
+        mkdir -p "$GT_ROOT/settings"
+        install -m 644 ${rigsJsonFile} "$GT_ROOT/rigs.json"
+        install -m 644 ${settingsJsonFile} "$GT_ROOT/settings/config.json"
+
+        mkdir -p "$GT_ROOT/${rigName}"
+        install -m 644 ${rigConfigFile} "$GT_ROOT/${rigName}/config.json"
+
+        ${crewActivations}
+
+        echo "Done."
+      '';
+
+      mayorAttach =
+        let
+          crewMember = cfg.mayorCrew;
+          hasCrewMember = crewMember != null;
+        in
+        assert hasCrewMember;
+        pkgs.writeShellScriptBin "gt-mayor-attach" ''
+          set -euo pipefail
+
+          # 1. Discover project root
+          PROJECT_ROOT="$(git rev-parse --show-toplevel)"
+
+          # 2. Set GT_ROOT
+          export GT_ROOT="$PROJECT_ROOT/.gt"
+
+          # 3. Activate nix-generated config into .gt/
+          echo "Activating rig ${rigName} at $GT_ROOT"
+          mkdir -p "$GT_ROOT/settings"
+          install -m 644 ${rigsJsonFile} "$GT_ROOT/rigs.json"
+          install -m 644 ${settingsJsonFile} "$GT_ROOT/settings/config.json"
+          mkdir -p "$GT_ROOT/${rigName}"
+          install -m 644 ${rigConfigFile} "$GT_ROOT/${rigName}/config.json"
+          ${crewActivations}
+
+          # 4. Ensure crew state.json exists
+          CREW_DIR="$GT_ROOT/${rigName}/crew/${crewMember}"
+          mkdir -p "$CREW_DIR"
+          if [ ! -f "$CREW_DIR/state.json" ]; then
+            NOW="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            cat > "$CREW_DIR/state.json" <<STATE
+          {
+            "name": "${crewMember}",
+            "rig": "${rigName}",
+            "clone_path": "$PROJECT_ROOT",
+            "branch": "$(git rev-parse --abbrev-ref HEAD)",
+            "created_at": "$NOW",
+            "updated_at": "$NOW"
+          }
+          STATE
+          fi
+
+          # 5. cd to crew dir and exec gt mayor attach
+          cd "$CREW_DIR"
+          exec ${gtPackage}/bin/gt mayor attach
+        '';
     };
 }

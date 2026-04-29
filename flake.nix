@@ -282,6 +282,111 @@
               echo "Pure evaluation checks passed"
               touch $out
             '';
+
+          # Standalone rig checks
+          eval-rig =
+            let
+              rig = gastownLib.mkRig {
+                inherit pkgs;
+                gtPackage = self.packages.${system}.gt;
+                config = {
+                  name = "my-rig";
+                  gitUrl = "git@github.com:test/standalone.git";
+                  beads.prefix = "sr";
+                  maxPolecats = 3;
+                  crew.alice = {
+                    role = "developer";
+                    githubUsername = "alice-gh";
+                    email = "alice@example.com";
+                  };
+                };
+              };
+            in
+            pkgs.runCommand "check-eval-rig" { nativeBuildInputs = [ pkgs.jq ]; } ''
+              # rigs.json has single entry
+              jq -e '.version == 1' ${rig.configDir}/rigs.json
+              jq -e '.rigs["my-rig"].git_url == "git@github.com:test/standalone.git"' ${rig.configDir}/rigs.json
+              jq -e '.rigs["my-rig"].beads.prefix == "sr"' ${rig.configDir}/rigs.json
+
+              # settings/config.json
+              jq -e '.type == "town-settings"' ${rig.configDir}/settings/config.json
+              jq -e '.default_agent == "claude"' ${rig.configDir}/settings/config.json
+
+              # rig config.json
+              jq -e '.type == "rig"' ${rig.rigConfig}
+              jq -e '.name == "my-rig"' ${rig.rigConfig}
+              jq -e '.git_url == "git@github.com:test/standalone.git"' ${rig.rigConfig}
+
+              # rig settings.json
+              jq -e '.max_polecats == 3' ${rig.rigSettings}
+              jq -e '.auto_restart == true' ${rig.rigSettings}
+
+              # crew config
+              jq -e '.type == "crew-member"' ${rig.crewConfigs.alice}
+              jq -e '.name == "alice"' ${rig.crewConfigs.alice}
+              jq -e '.role == "developer"' ${rig.crewConfigs.alice}
+              jq -e '.github_username == "alice-gh"' ${rig.crewConfigs.alice}
+
+              # configDir structure
+              test -f ${rig.configDir}/rigs.json
+              test -f ${rig.configDir}/settings/config.json
+              test -f ${rig.configDir}/my-rig/config.json
+              test -f ${rig.configDir}/my-rig/crew/alice/config.json
+
+              echo "Standalone rig checks passed"
+              touch $out
+            '';
+
+          eval-rig-pure =
+            let
+              cfg = gastownLib.evalRig {
+                config = {
+                  name = "pure-rig";
+                  gitUrl = "git@github.com:test/pure-rig.git";
+                  beads.prefix = "pr";
+                  crew.bob = {
+                    role = "reviewer";
+                    githubUsername = "bob-gh";
+                  };
+                };
+              };
+            in
+            pkgs.runCommand "check-eval-rig-pure" { } ''
+              [[ "${cfg.name}" == "pure-rig" ]]
+              [[ "${cfg.gitUrl}" == "git@github.com:test/pure-rig.git" ]]
+              [[ "${cfg.beads.prefix}" == "pr" ]]
+              [[ "${cfg.crew.bob.role}" == "reviewer" ]]
+              [[ "${cfg.crew.bob.githubUsername}" == "bob-gh" ]]
+
+              # mayorCrew auto-selects when exactly one crew member
+              [[ "${cfg.mayorCrew}" == "bob" ]]
+
+              echo "Pure rig evaluation checks passed"
+              touch $out
+            '';
+
+          eval-rig-mayor-crew =
+            let
+              cfg = gastownLib.evalRig {
+                config = {
+                  name = "mc-rig";
+                  gitUrl = "git@github.com:test/mc.git";
+                  beads.prefix = "mc";
+                  mayorCrew = "dev2";
+                  crew = {
+                    dev1 = { role = "developer"; };
+                    dev2 = { role = "lead"; };
+                  };
+                };
+              };
+            in
+            pkgs.runCommand "check-eval-rig-mayor-crew" { } ''
+              # Explicit mayorCrew takes precedence
+              [[ "${cfg.mayorCrew}" == "dev2" ]]
+
+              echo "Mayor crew selection checks passed"
+              touch $out
+            '';
         }
       );
 
