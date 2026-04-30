@@ -296,7 +296,10 @@ in
           ${gtPackage}/bin/gt install "$GT_ROOT" --force --no-beads --dolt-port ${toString cfg.doltPort}
 
           # 7. Ensure gt down runs on exit (detach, signal, error)
-          cleanup() { ${gtPackage}/bin/gt down; }
+          cleanup() {
+            ${gtPackage}/bin/gt down
+            ${gtPackage}/bin/gt rig remove ${rigName}
+          }
           trap cleanup EXIT
 
           # 8. Start services (Dolt, daemon, deacon, mayor, witnesses, refineries)
