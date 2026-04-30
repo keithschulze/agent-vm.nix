@@ -138,7 +138,23 @@
       );
 
       apps = forAllSystems (
-        { system, ... }:
+        { pkgs, system }:
+        let
+          rig = gastownLib.mkRig {
+            inherit pkgs;
+            gtPackage = self.packages.${system}.gt;
+            bdPackage = self.packages.${system}.bd;
+            config = {
+              name = "gt_nix";
+              gitUrl = "git@github.com:keithschulze/gastown.nix.git";
+              beads.prefix = "gn";
+              crew.ks = {
+                role = "developer";
+                githubUsername = "keithschulze";
+              };
+            };
+          };
+        in
         {
           gt = {
             type = "app";
@@ -147,6 +163,14 @@
           bd = {
             type = "app";
             program = "${self.packages.${system}.bd}/bin/bd";
+          };
+          mayorAttach = {
+            type = "app";
+            program = "${rig.mayorAttach}/bin/gt-mayor-attach";
+          };
+          test = {
+            type = "app";
+            program = "${rig.test}/bin/gt-test-rig";
           };
           default = self.apps.${system}.gt;
         }
@@ -159,6 +183,7 @@
             buildInputs = [
               self.packages.${system}.gt
               self.packages.${system}.bd
+              pkgs.dolt
             ];
           };
         }

@@ -1,4 +1,5 @@
-# Gas Town runtime (polecat worktree artifacts)
+# Gas Town runtime
+.gt/
 .beads/
 .claude/
 .runtime/
