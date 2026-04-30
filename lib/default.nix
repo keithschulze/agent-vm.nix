@@ -290,7 +290,11 @@ in
           # 7. Start services (Dolt, daemon, deacon, mayor, witnesses, refineries)
           ${gtPackage}/bin/gt up
 
-          # 8. Attach to mayor session (blocks until detach with Ctrl-B D)
+          # 8. Init Dolt DB and adopt rig into GT runtime
+          ${gtPackage}/bin/gt dolt init-rig ${rigName}
+          ${gtPackage}/bin/gt rig add ${rigName} --adopt --prefix ${cfg.beads.prefix}
+
+          # 9. Attach to mayor session (blocks until detach with Ctrl-B D)
           cd "$CREW_DIR"
           ${gtPackage}/bin/gt mayor attach
           # cleanup runs automatically via trap
