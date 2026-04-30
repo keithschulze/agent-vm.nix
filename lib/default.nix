@@ -306,7 +306,10 @@ in
           ${gtPackage}/bin/gt dolt init-rig ${rigName}
           ${gtPackage}/bin/gt rig add ${rigName} --adopt --prefix ${cfg.beads.prefix}
 
-          # 10. Attach to mayor session (blocks until detach with Ctrl-B D)
+          # 10. Start rig agents (witness, refinery) before mayor attach
+          ${gtPackage}/bin/gt rig start ${rigName}
+
+          # 11. Attach to mayor session (blocks until detach with Ctrl-B D)
           cd "$CREW_DIR"
           ${gtPackage}/bin/gt mayor attach
           # cleanup runs automatically via trap
