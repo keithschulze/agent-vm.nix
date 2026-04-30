@@ -280,21 +280,33 @@ in
           STATE
           fi
 
-          # 5. Initialize GT directory structure
+          # 5. Create mayor and refinery git clones (idempotent)
+          if [ ! -d "$GT_ROOT/${rigName}/mayor/rig/.git" ]; then
+            echo "Cloning mayor worktree for ${rigName}..."
+            mkdir -p "$GT_ROOT/${rigName}/mayor"
+            git clone ${cfg.gitUrl} "$GT_ROOT/${rigName}/mayor/rig"
+          fi
+          if [ ! -d "$GT_ROOT/${rigName}/refinery/rig/.git" ]; then
+            echo "Cloning refinery worktree for ${rigName}..."
+            mkdir -p "$GT_ROOT/${rigName}/refinery"
+            git clone ${cfg.gitUrl} "$GT_ROOT/${rigName}/refinery/rig"
+          fi
+
+          # 6. Initialize GT directory structure
           ${gtPackage}/bin/gt install "$GT_ROOT" --force --no-beads --dolt-port ${toString cfg.doltPort}
 
-          # 6. Ensure gt down runs on exit (detach, signal, error)
+          # 7. Ensure gt down runs on exit (detach, signal, error)
           cleanup() { ${gtPackage}/bin/gt down; }
           trap cleanup EXIT
 
-          # 7. Start services (Dolt, daemon, deacon, mayor, witnesses, refineries)
+          # 8. Start services (Dolt, daemon, deacon, mayor, witnesses, refineries)
           ${gtPackage}/bin/gt up
 
-          # 8. Init Dolt DB and adopt rig into GT runtime
+          # 9. Init Dolt DB and adopt rig into GT runtime
           ${gtPackage}/bin/gt dolt init-rig ${rigName}
           ${gtPackage}/bin/gt rig add ${rigName} --adopt --prefix ${cfg.beads.prefix}
 
-          # 9. Attach to mayor session (blocks until detach with Ctrl-B D)
+          # 10. Attach to mayor session (blocks until detach with Ctrl-B D)
           cd "$CREW_DIR"
           ${gtPackage}/bin/gt mayor attach
           # cleanup runs automatically via trap
