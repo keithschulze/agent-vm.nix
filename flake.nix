@@ -168,6 +168,10 @@
             type = "app";
             program = "${rig.mayorAttach}/bin/gt-mayor-attach";
           };
+          gtUp = {
+            type = "app";
+            program = "${rig.gtUp}/bin/gt-up";
+          };
           test = {
             type = "app";
             program = "${rig.test}/bin/gt-test-rig";
