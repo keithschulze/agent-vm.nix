@@ -235,15 +235,15 @@ in
           echo "=== All integration tests passed ==="
         '';
 
-      mayorAttach =
+      gtUp =
         let
           crewMember = cfg.mayorCrew;
           hasCrewMember = crewMember != null;
-          runtimeDeps = [ pkgs.git pkgs.tmux pkgs.dolt gtPackage ]
+          runtimeDeps = [ pkgs.git pkgs.dolt gtPackage ]
             ++ lib.optional (bdPackage != null) bdPackage;
         in
         assert hasCrewMember;
-        pkgs.writeShellScriptBin "gt-mayor-attach" ''
+        pkgs.writeShellScriptBin "gt-up" ''
           set -euo pipefail
           export PATH="${lib.makeBinPath runtimeDeps}:$PATH"
 
@@ -295,27 +295,63 @@ in
           # 6. Initialize GT directory structure
           ${gtPackage}/bin/gt install "$GT_ROOT" --force --no-beads --dolt-port ${toString cfg.doltPort}
 
-          # 7. Ensure gt down runs on exit (detach, signal, error)
-          cleanup() {
-            ${gtPackage}/bin/gt down
-            ${gtPackage}/bin/gt rig remove ${rigName}
-          }
-          trap cleanup EXIT
-
-          # 8. Start services (Dolt, daemon, deacon, mayor, witnesses, refineries)
+          # 7. Start services (Dolt, daemon, deacon, mayor, witnesses, refineries)
           ${gtPackage}/bin/gt up
 
-          # 9. Init Dolt DB and adopt rig into GT runtime
+          # 8. Init Dolt DB and adopt rig into GT runtime
           ${gtPackage}/bin/gt dolt init-rig ${rigName}
           ${gtPackage}/bin/gt rig add ${rigName} --adopt --prefix ${cfg.beads.prefix}
 
-          # 10. Start rig agents (witness, refinery) before mayor attach
+          # 9. Start rig agents (witness, refinery)
           ${gtPackage}/bin/gt rig start ${rigName}
 
-          # 11. Attach to mayor session (blocks until detach with Ctrl-B D)
+          echo "Gas Town up: rig ${rigName} ready"
+        '';
+
+      gtDown =
+        let
+          runtimeDeps = [ pkgs.git gtPackage ];
+        in
+        pkgs.writeShellScriptBin "gt-down" ''
+          set -euo pipefail
+          export PATH="${lib.makeBinPath runtimeDeps}:$PATH"
+
+          # 1. Discover project root
+          PROJECT_ROOT="$(git rev-parse --show-toplevel)"
+
+          # 2. Set GT_ROOT and GT_TOWN_ROOT
+          export GT_ROOT="$PROJECT_ROOT/.gt"
+          export GT_TOWN_ROOT="$GT_ROOT"
+
+          # 3. Tear down services and remove rig
+          ${gtPackage}/bin/gt down
+          ${gtPackage}/bin/gt rig remove ${rigName}
+
+          echo "Gas Town down: rig ${rigName} removed"
+        '';
+
+      mayorAttach =
+        let
+          crewMember = cfg.mayorCrew;
+          hasCrewMember = crewMember != null;
+          runtimeDeps = [ pkgs.git pkgs.tmux gtPackage ];
+        in
+        assert hasCrewMember;
+        pkgs.writeShellScriptBin "gt-mayor-attach" ''
+          set -euo pipefail
+          export PATH="${lib.makeBinPath runtimeDeps}:$PATH"
+
+          # 1. Discover project root
+          PROJECT_ROOT="$(git rev-parse --show-toplevel)"
+
+          # 2. Set GT_ROOT and GT_TOWN_ROOT
+          export GT_ROOT="$PROJECT_ROOT/.gt"
+          export GT_TOWN_ROOT="$GT_ROOT"
+
+          # 3. Attach to mayor session (blocks until detach with Ctrl-B D)
+          CREW_DIR="$GT_ROOT/${rigName}/crew/${crewMember}"
           cd "$CREW_DIR"
           ${gtPackage}/bin/gt mayor attach
-          # cleanup runs automatically via trap
         '';
     };
 }
