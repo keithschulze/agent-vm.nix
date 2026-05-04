@@ -98,7 +98,7 @@ Generates `city.toml` and lifecycle scripts (`gcUp`, `gcDown`, `gcAttach`).
 
 The lifecycle scripts manage the full Gas Town lifecycle:
 
-- **`gcUp`** — installs `pack.toml` and `city.toml` into `.gt/`, runs `gc init`, then `gc up`
+- **`gcUp`** — installs `pack.toml` and `city.toml` into `.gc/`, runs `gc init`, then `gc up`
 - **`gcDown`** — runs `gc down` to tear down all services
 - **`gcAttach`** — runs `gc mayor attach` (blocks until detach)
 
@@ -136,7 +136,7 @@ cityCfg = gastown-nix.lib.evalCity {
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `name` | string | *required* | Pack name identifier |
-| `schema` | int | `1` | Schema version for the pack definition |
+| `schema` | int | `2` | Schema version for the pack definition |
 | `agents.<name>.scope` | string | *required* | Agent scope (`"town"`, `"rig"`, `"project"`) |
 | `agents.<name>.provider` | string | `"claude"` | AI provider for this agent |
 | `agents.<name>.maxConcurrent` | int | `1` | Maximum concurrent instances |
@@ -149,7 +149,7 @@ cityCfg = gastown-nix.lib.evalCity {
 | `workspace.provider` | string | `"local"` | Workspace provider backend |
 | `session.provider` | string | `"tmux"` | Session multiplexer provider |
 | `session.concurrentPerAgent` | int | `1` | Max concurrent sessions per agent |
-| `beads.provider` | string | `"dolt"` | Beads storage provider |
+| `beads.provider` | string | `"file"` | Beads storage provider |
 | `beads.prefix` | string | `"hq"` | Bead ID prefix for city-level beads |
 | `daemon.patrolInterval` | string | `"30s"` | Agent health check interval |
 | `daemon.maxRestarts` | int | `3` | Max automatic restarts per agent |
