@@ -86,12 +86,8 @@
             gcPackage = self.packages.${system}.gc;
             config = {
               name = "gt_nix";
+              path = ".";
               gitUrl = "git@github.com:keithschulze/gastown.nix.git";
-              beads.prefix = "gn";
-              crew.ks = {
-                role = "developer";
-                githubUsername = "keithschulze";
-              };
             };
           };
         in
@@ -142,14 +138,8 @@
                 gcPackage = self.packages.${system}.gc;
                 config = {
                   name = "my-rig";
+                  path = "rigs/my-rig";
                   gitUrl = "git@github.com:test/standalone.git";
-                  beads.prefix = "sr";
-                  maxPolecats = 3;
-                  crew.alice = {
-                    role = "developer";
-                    githubUsername = "alice-gh";
-                    email = "alice@example.com";
-                  };
                 };
               };
             in
@@ -157,7 +147,7 @@
               # rigs.json has single entry
               jq -e '.version == 1' ${rig.configDir}/rigs.json
               jq -e '.rigs["my-rig"].git_url == "git@github.com:test/standalone.git"' ${rig.configDir}/rigs.json
-              jq -e '.rigs["my-rig"].beads.prefix == "sr"' ${rig.configDir}/rigs.json
+              jq -e '.rigs["my-rig"].path == "rigs/my-rig"' ${rig.configDir}/rigs.json
 
               # settings/config.json
               jq -e '.type == "town-settings"' ${rig.configDir}/settings/config.json
@@ -168,21 +158,10 @@
               jq -e '.name == "my-rig"' ${rig.rigConfig}
               jq -e '.git_url == "git@github.com:test/standalone.git"' ${rig.rigConfig}
 
-              # rig settings.json
-              jq -e '.max_polecats == 3' ${rig.rigSettings}
-              jq -e '.auto_restart == true' ${rig.rigSettings}
-
-              # crew config
-              jq -e '.type == "crew-member"' ${rig.crewConfigs.alice}
-              jq -e '.name == "alice"' ${rig.crewConfigs.alice}
-              jq -e '.role == "developer"' ${rig.crewConfigs.alice}
-              jq -e '.github_username == "alice-gh"' ${rig.crewConfigs.alice}
-
               # configDir structure
               test -f ${rig.configDir}/rigs.json
               test -f ${rig.configDir}/settings/config.json
               test -f ${rig.configDir}/my-rig/config.json
-              test -f ${rig.configDir}/my-rig/crew/alice/config.json
 
               echo "Standalone rig checks passed"
               touch $out
@@ -195,26 +174,17 @@
                 gcPackage = self.packages.${system}.gc;
                 config = {
                   name = "minimal-rig";
+                  path = "rigs/minimal";
                   gitUrl = "git@github.com:test/minimal-rig.git";
-                  beads.prefix = "mr";
                 };
               };
             in
             pkgs.runCommand "check-eval-rig-minimal" { nativeBuildInputs = [ pkgs.jq ]; } ''
               # Verify basic config
               jq -e '.rigs["minimal-rig"].git_url == "git@github.com:test/minimal-rig.git"' ${rig.configDir}/rigs.json
-              jq -e '.rigs["minimal-rig"].beads.prefix == "mr"' ${rig.configDir}/rigs.json
 
               jq -e '.name == "minimal-rig"' ${rig.rigConfig}
               jq -e '.default_branch == "main"' ${rig.rigConfig}
-
-              # Verify defaults apply
-              jq -e '.max_polecats == 10' ${rig.rigSettings}
-              jq -e '.auto_restart == true' ${rig.rigSettings}
-              jq -e '.default_formula == "mol-polecat-work"' ${rig.rigSettings}
-
-              # No crew members
-              jq -e '.crew == {}' ${rig.rigConfig}
 
               echo "Minimal standalone rig checks passed"
               touch $out
@@ -225,49 +195,18 @@
               cfg = gastownLib.evalRig {
                 config = {
                   name = "pure-rig";
+                  path = "rigs/pure";
                   gitUrl = "git@github.com:test/pure-rig.git";
-                  beads.prefix = "pr";
-                  crew.bob = {
-                    role = "reviewer";
-                    githubUsername = "bob-gh";
-                  };
                 };
               };
             in
             pkgs.runCommand "check-eval-rig-pure" { } ''
               [[ "${cfg.name}" == "pure-rig" ]]
+              [[ "${cfg.path}" == "rigs/pure" ]]
               [[ "${cfg.gitUrl}" == "git@github.com:test/pure-rig.git" ]]
-              [[ "${cfg.beads.prefix}" == "pr" ]]
-              [[ "${cfg.crew.bob.role}" == "reviewer" ]]
-              [[ "${cfg.crew.bob.githubUsername}" == "bob-gh" ]]
-
-              # mayorCrew auto-selects when exactly one crew member
-              [[ "${cfg.mayorCrew}" == "bob" ]]
+              [[ "${cfg.defaultBranch}" == "main" ]]
 
               echo "Pure rig evaluation checks passed"
-              touch $out
-            '';
-
-          eval-rig-mayor-crew =
-            let
-              cfg = gastownLib.evalRig {
-                config = {
-                  name = "mc-rig";
-                  gitUrl = "git@github.com:test/mc.git";
-                  beads.prefix = "mc";
-                  mayorCrew = "dev2";
-                  crew = {
-                    dev1 = { role = "developer"; };
-                    dev2 = { role = "lead"; };
-                  };
-                };
-              };
-            in
-            pkgs.runCommand "check-eval-rig-mayor-crew" { } ''
-              # Explicit mayorCrew takes precedence
-              [[ "${cfg.mayorCrew}" == "dev2" ]]
-
-              echo "Mayor crew selection checks passed"
               touch $out
             '';
 
@@ -278,13 +217,8 @@
                 gcPackage = self.packages.${system}.gc;
                 config = {
                   name = "test-rig";
+                  path = "rigs/test";
                   gitUrl = "git@github.com:test/integration.git";
-                  beads.prefix = "ti";
-                  crew.tester = {
-                    role = "developer";
-                    githubUsername = "tester-gh";
-                    email = "tester@example.com";
-                  };
                 };
               };
             in

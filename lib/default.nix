@@ -57,28 +57,9 @@ let
 
   rigToValue = _name: rig:
     filterAttrs (_: v: v != null) {
+      path = rig.path;
       git_url = rig.gitUrl;
       default_branch = rig.defaultBranch;
-      mayor_crew = rig.mayorCrew;
-      max_polecats = rig.maxPolecats;
-      auto_restart = rig.autoRestart;
-      auto_start_on_up = rig.autoStartOnUp;
-      default_formula = rig.defaultFormula;
-      dnd = rig.dnd;
-      dolt_port = rig.doltPort;
-      polecat_branch_template = rig.polecatBranchTemplate;
-      priority_adjustment = rig.priorityAdjustment;
-      beads = {
-        prefix = rig.beads.prefix;
-      };
-      crew = mapAttrs crewToValue rig.crew;
-    };
-
-  crewToValue = _name: member:
-    filterAttrs (_: v: v != null) {
-      role = member.role;
-      github_username = member.githubUsername;
-      email = member.email;
     };
 
 in

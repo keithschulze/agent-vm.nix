@@ -67,7 +67,7 @@ in
 
     rigs = mkOption {
       type = types.attrsOf (types.submodule (
-        { name, config, ... }:
+        { name, ... }:
         {
           imports = [ ./rig.nix ];
 
@@ -77,25 +77,7 @@ in
               default = name;
               description = "Rig name, defaults to the attribute key.";
             };
-
-            mayorCrew = mkOption {
-              type = types.nullOr types.str;
-              default = null;
-              description = ''
-                Which crew member mayorAttach uses. When null and exactly one
-                crew member is declared, that member is auto-selected.
-              '';
-            };
           };
-
-          config =
-            let
-              crewNames = builtins.attrNames config.crew;
-              crewCount = builtins.length crewNames;
-            in
-            lib.mkIf (crewCount == 1) {
-              mayorCrew = lib.mkDefault (builtins.head crewNames);
-            };
         }
       ));
       default = { };

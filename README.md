@@ -33,19 +33,13 @@ single-rig setups where the project itself hosts the configuration.
       bdPackage = gastown-nix.packages.x86_64-linux.bd;  # optional
       config = {
         name = "my-project";
+        path = ".";
         gitUrl = "git@github.com:org/project.git";
-        beads.prefix = "mp";
-        crew.alice = {
-          role = "developer";
-          githubUsername = "alice-gh";
-        };
       };
     };
   in {
     # rig.config       - evaluated configuration
     # rig.rigConfig    - rig config.json derivation
-    # rig.rigSettings  - rig settings.json derivation
-    # rig.crewConfigs  - per-member config.json derivations
     # rig.configDir    - combined directory tree
     # rig.mayorAttach  - script to manage full GT lifecycle (up/attach/down)
     apps.mayorAttach = {
@@ -85,13 +79,13 @@ Use `evalRig` when you only need the evaluated config without derivations:
 cfg = gastown-nix.lib.evalRig {
   config = {
     name = "my-project";
+    path = ".";
     gitUrl = "git@github.com:org/project.git";
-    beads.prefix = "mp";
-    crew.alice = { role = "developer"; };
   };
 };
 # cfg.name         => "my-project"
-# cfg.mayorCrew    => "alice" (auto-selected, single crew member)
+# cfg.path         => "."
+# cfg.defaultBranch => "main"
 ```
 
 ## Rig options
@@ -99,19 +93,10 @@ cfg = gastown-nix.lib.evalRig {
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `name` | string | *required* | Rig name, used as the directory under GT_ROOT |
+| `path` | string | *required* | Filesystem path to the rig's working directory |
 | `gitUrl` | string | *required* | Git URL for the rig's repository |
 | `defaultBranch` | string | `"main"` | Default branch name |
-| `beads.prefix` | string | *required* | Issue ID prefix |
-| `maxPolecats` | positive int | `10` | Max concurrent polecat workers |
-| `autoRestart` | bool | `true` | Auto-restart agents on failure |
-| `autoStartOnUp` | bool | `false` | Start agents when rig comes up |
-| `defaultFormula` | string | `"mol-polecat-work"` | Default workflow formula |
-| `dnd` | bool | `false` | Do Not Disturb mode |
-| `polecatBranchTemplate` | string or null | `null` | Custom polecat branch naming |
-| `priorityAdjustment` | int | `0` | Priority offset for dispatch |
-| `mayorCrew` | string or null | `null` | Which crew member `mayorAttach` uses (auto-selected when exactly one crew member) |
 | `defaultAgent` | string | `"claude"` | Default agent type |
-| `crew` | attrsOf { role, githubUsername, email } | `{}` | Crew member definitions |
 
 ## Running checks
 
