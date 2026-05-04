@@ -117,7 +117,7 @@ in
         export PATH="${lib.makeBinPath runtimeDeps}:$PATH"
 
         PROJECT_ROOT="$(git rev-parse --show-toplevel)"
-        export GC_ROOT="$PROJECT_ROOT/.gt"
+        export GC_ROOT="$PROJECT_ROOT/.gc"
 
         # Step 1: Install TOML
         echo "Installing configuration..."
@@ -125,9 +125,9 @@ in
         install -m 644 ${packToml} "$GC_ROOT/pack.toml"
         install -m 644 ${cityToml} "$GC_ROOT/city.toml"
 
-        # Step 2: gc init
+        # Step 2: gc init (--existing for idempotency)
         echo "Initializing workspace..."
-        ${gcPackage}/bin/gc init
+        ${gcPackage}/bin/gc init --existing
 
         # Step 3: gc up
         echo "Starting services..."
@@ -139,7 +139,7 @@ in
         export PATH="${lib.makeBinPath runtimeDeps}:$PATH"
 
         PROJECT_ROOT="$(git rev-parse --show-toplevel)"
-        export GC_ROOT="$PROJECT_ROOT/.gt"
+        export GC_ROOT="$PROJECT_ROOT/.gc"
 
         ${gcPackage}/bin/gc down
       '';
@@ -149,7 +149,7 @@ in
         export PATH="${lib.makeBinPath runtimeDeps}:$PATH"
 
         PROJECT_ROOT="$(git rev-parse --show-toplevel)"
-        export GC_ROOT="$PROJECT_ROOT/.gt"
+        export GC_ROOT="$PROJECT_ROOT/.gc"
 
         ${gcPackage}/bin/gc mayor attach
       '';

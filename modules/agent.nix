@@ -5,8 +5,8 @@ in
 {
   options = {
     scope = mkOption {
-      type = types.str;
-      description = "Scope the agent operates in (e.g. 'rig', 'town', 'project').";
+      type = types.enum [ "rig" "town" "project" ];
+      description = "Scope the agent operates in.";
     };
 
     provider = mkOption {

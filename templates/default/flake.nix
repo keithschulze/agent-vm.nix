@@ -80,7 +80,6 @@
         devShells.default = pkgs.mkShell {
           buildInputs = [
             gcPackage
-            pkgs.dolt
           ];
         };
       }
