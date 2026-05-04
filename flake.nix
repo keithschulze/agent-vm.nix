@@ -182,7 +182,7 @@
 
               # Validate pack metadata
               assert data['pack']['name'] == 'test-pack', f'name: {data[\"pack\"][\"name\"]}'
-              assert data['pack']['schema'] == 1, f'schema: {data[\"pack\"][\"schema\"]}'
+              assert data['pack']['schema'] == 2, f'schema: {data[\"pack\"][\"schema\"]}'
 
               # Validate agents
               assert 'mayor' in data['agents'], 'missing mayor'
@@ -239,7 +239,7 @@
               assert data['session']['concurrent_per_agent'] == 3
 
               # Validate beads
-              assert data['beads']['provider'] == 'dolt'
+              assert data['beads']['provider'] == 'file'
               assert data['beads']['prefix'] == 'tc'
 
               # Validate daemon
@@ -282,7 +282,7 @@
             pkgs.runCommand "check-eval-pure" { } ''
               # Pack evaluation
               [[ "${packCfg.name}" == "pure-pack" ]]
-              [[ "${toString packCfg.schema}" == "1" ]]
+              [[ "${toString packCfg.schema}" == "2" ]]
 
               # City evaluation
               [[ "${cityCfg.workspace.name}" == "pure-city" ]]
