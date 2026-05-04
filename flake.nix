@@ -81,13 +81,35 @@
       apps = forAllSystems (
         { pkgs, system }:
         let
-          rig = gastownLib.mkRig {
+          packToml = gastownLib.mkPack {
             inherit pkgs;
-            gcPackage = self.packages.${system}.gc;
             config = {
               name = "gt_nix";
-              path = ".";
-              gitUrl = "git@github.com:keithschulze/gastown.nix.git";
+              agents = {
+                mayor = {
+                  scope = "town";
+                  maxConcurrent = 1;
+                };
+                witness = {
+                  scope = "rig";
+                  maxConcurrent = 1;
+                };
+                polecat = {
+                  scope = "rig";
+                  maxConcurrent = 10;
+                };
+              };
+            };
+          };
+          city = gastownLib.mkCity {
+            inherit pkgs packToml;
+            gcPackage = self.packages.${system}.gc;
+            config = {
+              workspace.name = "gt_nix";
+              rigs.gt_nix = {
+                path = ".";
+                gitUrl = "git@github.com:keithschulze/gastown.nix.git";
+              };
             };
           };
         in
@@ -96,21 +118,17 @@
             type = "app";
             program = "${self.packages.${system}.gc}/bin/gc";
           };
-          mayorAttach = {
+          gcUp = {
             type = "app";
-            program = "${rig.mayorAttach}/bin/gt-mayor-attach";
+            program = "${city.gcUp}/bin/gc-up";
           };
-          gtUp = {
+          gcDown = {
             type = "app";
-            program = "${rig.gtUp}/bin/gt-up";
+            program = "${city.gcDown}/bin/gc-down";
           };
-          gtDown = {
+          gcAttach = {
             type = "app";
-            program = "${rig.gtDown}/bin/gt-down";
-          };
-          test = {
-            type = "app";
-            program = "${rig.test}/bin/gt-test-rig";
+            program = "${city.gcAttach}/bin/gc-attach";
           };
           default = self.apps.${system}.gc;
         }
@@ -122,7 +140,6 @@
           default = pkgs.mkShell {
             buildInputs = [
               self.packages.${system}.gc
-              pkgs.dolt
             ];
           };
         }
@@ -130,106 +147,189 @@
 
       checks = forAllSystems (
         { pkgs, system }:
+        let
+          pythonWithTomli = pkgs.python3.withPackages (ps: [ ps.tomli ]);
+        in
         {
-          eval-rig =
+          check-pack-toml =
             let
-              rig = gastownLib.mkRig {
+              packToml = gastownLib.mkPack {
                 inherit pkgs;
-                gcPackage = self.packages.${system}.gc;
                 config = {
-                  name = "my-rig";
-                  path = "rigs/my-rig";
-                  gitUrl = "git@github.com:test/standalone.git";
+                  name = "test-pack";
+                  agents = {
+                    mayor = {
+                      scope = "town";
+                      maxConcurrent = 1;
+                    };
+                    witness = {
+                      scope = "rig";
+                      maxConcurrent = 1;
+                    };
+                    polecat = {
+                      scope = "rig";
+                      maxConcurrent = 10;
+                    };
+                  };
                 };
               };
             in
-            pkgs.runCommand "check-eval-rig" { nativeBuildInputs = [ pkgs.jq ]; } ''
-              # rigs.json has single entry
-              jq -e '.version == 1' ${rig.configDir}/rigs.json
-              jq -e '.rigs["my-rig"].git_url == "git@github.com:test/standalone.git"' ${rig.configDir}/rigs.json
-              jq -e '.rigs["my-rig"].path == "rigs/my-rig"' ${rig.configDir}/rigs.json
+            pkgs.runCommand "check-pack-toml" { nativeBuildInputs = [ pythonWithTomli ]; } ''
+              python3 -c "
+              import tomli, sys
+              with open('${packToml}', 'rb') as f:
+                  data = tomli.load(f)
 
-              # settings/config.json
-              jq -e '.type == "town-settings"' ${rig.configDir}/settings/config.json
-              jq -e '.default_agent == "claude"' ${rig.configDir}/settings/config.json
+              # Validate pack metadata
+              assert data['pack']['name'] == 'test-pack', f'name: {data[\"pack\"][\"name\"]}'
+              assert data['pack']['schema'] == 1, f'schema: {data[\"pack\"][\"schema\"]}'
 
-              # rig config.json
-              jq -e '.type == "rig"' ${rig.rigConfig}
-              jq -e '.name == "my-rig"' ${rig.rigConfig}
-              jq -e '.git_url == "git@github.com:test/standalone.git"' ${rig.rigConfig}
+              # Validate agents
+              assert 'mayor' in data['agents'], 'missing mayor'
+              assert data['agents']['mayor']['scope'] == 'town'
+              assert data['agents']['mayor']['max_concurrent'] == 1
+              assert data['agents']['witness']['scope'] == 'rig'
+              assert data['agents']['polecat']['scope'] == 'rig'
+              assert data['agents']['polecat']['max_concurrent'] == 10
 
-              # configDir structure
-              test -f ${rig.configDir}/rigs.json
-              test -f ${rig.configDir}/settings/config.json
-              test -f ${rig.configDir}/my-rig/config.json
-
-              echo "Standalone rig checks passed"
+              print('pack.toml validation passed')
+              "
               touch $out
             '';
 
-          eval-rig-minimal =
+          check-city-toml =
             let
-              rig = gastownLib.mkRig {
+              packToml = gastownLib.mkPack {
                 inherit pkgs;
+                config = {
+                  name = "city-test";
+                  agents.mayor = {
+                    scope = "town";
+                    maxConcurrent = 1;
+                  };
+                };
+              };
+              city = gastownLib.mkCity {
+                inherit pkgs packToml;
                 gcPackage = self.packages.${system}.gc;
                 config = {
-                  name = "minimal-rig";
-                  path = "rigs/minimal";
-                  gitUrl = "git@github.com:test/minimal-rig.git";
+                  workspace.name = "test-city";
+                  session.concurrentPerAgent = 3;
+                  beads.prefix = "tc";
+                  daemon.patrolInterval = "15s";
+                  rigs.my-rig = {
+                    path = "rigs/my-rig";
+                    gitUrl = "git@github.com:test/rig.git";
+                  };
                 };
               };
             in
-            pkgs.runCommand "check-eval-rig-minimal" { nativeBuildInputs = [ pkgs.jq ]; } ''
-              # Verify basic config
-              jq -e '.rigs["minimal-rig"].git_url == "git@github.com:test/minimal-rig.git"' ${rig.configDir}/rigs.json
+            pkgs.runCommand "check-city-toml" { nativeBuildInputs = [ pythonWithTomli ]; } ''
+              python3 -c "
+              import tomli, sys
+              with open('${city.cityToml}', 'rb') as f:
+                  data = tomli.load(f)
 
-              jq -e '.name == "minimal-rig"' ${rig.rigConfig}
-              jq -e '.default_branch == "main"' ${rig.rigConfig}
+              # Validate workspace
+              assert data['workspace']['name'] == 'test-city'
+              assert data['workspace']['provider'] == 'local'
 
-              echo "Minimal standalone rig checks passed"
+              # Validate session
+              assert data['session']['provider'] == 'tmux'
+              assert data['session']['concurrent_per_agent'] == 3
+
+              # Validate beads
+              assert data['beads']['provider'] == 'dolt'
+              assert data['beads']['prefix'] == 'tc'
+
+              # Validate daemon
+              assert data['daemon']['patrol_interval'] == '15s'
+              assert data['daemon']['max_restarts'] == 3
+              assert data['daemon']['shutdown_timeout'] == '60s'
+
+              # Validate rigs
+              assert 'my-rig' in data['rigs'], f'rigs: {data[\"rigs\"]}'
+              assert data['rigs']['my-rig']['path'] == 'rigs/my-rig'
+              assert data['rigs']['my-rig']['git_url'] == 'git@github.com:test/rig.git'
+              assert data['rigs']['my-rig']['default_branch'] == 'main'
+
+              print('city.toml validation passed')
+              "
               touch $out
             '';
 
-          eval-rig-pure =
+          check-eval-pure =
             let
-              cfg = gastownLib.evalRig {
+              packCfg = gastownLib.evalPack {
                 config = {
-                  name = "pure-rig";
-                  path = "rigs/pure";
-                  gitUrl = "git@github.com:test/pure-rig.git";
+                  name = "pure-pack";
+                  agents.worker = {
+                    scope = "rig";
+                    maxConcurrent = 5;
+                  };
+                };
+              };
+              cityCfg = gastownLib.evalCity {
+                config = {
+                  workspace.name = "pure-city";
+                  rigs.alpha = {
+                    path = "rigs/alpha";
+                    gitUrl = "git@github.com:test/alpha.git";
+                  };
                 };
               };
             in
-            pkgs.runCommand "check-eval-rig-pure" { } ''
-              [[ "${cfg.name}" == "pure-rig" ]]
-              [[ "${cfg.path}" == "rigs/pure" ]]
-              [[ "${cfg.gitUrl}" == "git@github.com:test/pure-rig.git" ]]
-              [[ "${cfg.defaultBranch}" == "main" ]]
+            pkgs.runCommand "check-eval-pure" { } ''
+              # Pack evaluation
+              [[ "${packCfg.name}" == "pure-pack" ]]
+              [[ "${toString packCfg.schema}" == "1" ]]
 
-              echo "Pure rig evaluation checks passed"
+              # City evaluation
+              [[ "${cityCfg.workspace.name}" == "pure-city" ]]
+              [[ "${cityCfg.session.provider}" == "tmux" ]]
+              [[ "${cityCfg.rigs.alpha.path}" == "rigs/alpha" ]]
+              [[ "${cityCfg.rigs.alpha.gitUrl}" == "git@github.com:test/alpha.git" ]]
+              [[ "${cityCfg.rigs.alpha.defaultBranch}" == "main" ]]
+
+              echo "Pure evaluation checks passed"
               touch $out
             '';
 
-          check-integration =
+          check-lifecycle-scripts =
             let
-              rig = gastownLib.mkRig {
+              packToml = gastownLib.mkPack {
                 inherit pkgs;
+                config = {
+                  name = "lifecycle-test";
+                  agents.mayor = {
+                    scope = "town";
+                    maxConcurrent = 1;
+                  };
+                };
+              };
+              city = gastownLib.mkCity {
+                inherit pkgs packToml;
                 gcPackage = self.packages.${system}.gc;
                 config = {
-                  name = "test-rig";
-                  path = "rigs/test";
-                  gitUrl = "git@github.com:test/integration.git";
+                  workspace.name = "lifecycle-test";
+                  rigs.test-rig = {
+                    path = "rigs/test";
+                    gitUrl = "git@github.com:test/lifecycle.git";
+                  };
                 };
               };
             in
-            pkgs.runCommand "check-integration" {
-              nativeBuildInputs = [ pkgs.git pkgs.jq self.packages.${system}.gc ];
-            } ''
-              export HOME="$TMPDIR/home"
-              mkdir -p "$HOME"
-              git config --global user.email "test@test.com"
-              git config --global user.name "Test"
-              ${rig.test}/bin/gt-test-rig
+            pkgs.runCommand "check-lifecycle-scripts" { } ''
+              # Verify scripts exist and are executable
+              test -x ${city.gcUp}/bin/gc-up
+              test -x ${city.gcDown}/bin/gc-down
+              test -x ${city.gcAttach}/bin/gc-attach
+
+              # Verify scripts reference the TOML files
+              grep -q "pack.toml" ${city.gcUp}/bin/gc-up
+              grep -q "city.toml" ${city.gcUp}/bin/gc-up
+
+              echo "Lifecycle scripts check passed"
               touch $out
             '';
         }

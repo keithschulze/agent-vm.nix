@@ -1,34 +1,18 @@
 {
   "nodes": {
-    "beads-src": {
+    "gascity-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1777328094,
-        "narHash": "sha256-aTMgTM5W2QBYzuwu+WkEZTOu6hAuMib179fMq4Xf3CQ=",
+        "lastModified": 1777884397,
+        "narHash": "sha256-Jv1eLXONYGtAHNDg5IQ4bB3Ny6Iah1rIydIo1znWHZs=",
         "owner": "gastownhall",
-        "repo": "beads",
-        "rev": "f4c46d917c27397d438242f49a2025b9205431a4",
+        "repo": "gascity",
+        "rev": "dfe314b3eec06f545dd5ccb0b1d9d42c18698b5f",
         "type": "github"
       },
       "original": {
         "owner": "gastownhall",
-        "repo": "beads",
-        "type": "github"
-      }
-    },
-    "gastown-src": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1777366244,
-        "narHash": "sha256-0bmixwMH/gJsOlXW+fqxCVAvQQmyjR0vLsLRDMK6uUw=",
-        "owner": "gastownhall",
-        "repo": "gastown",
-        "rev": "3075b632286690065b2a5f4227135d9c7ced0cb1",
-        "type": "github"
-      },
-      "original": {
-        "owner": "gastownhall",
-        "repo": "gastown",
+        "repo": "gascity",
         "type": "github"
       }
     },
@@ -50,8 +34,7 @@
     },
     "root": {
       "inputs": {
-        "beads-src": "beads-src",
-        "gastown-src": "gastown-src",
+        "gascity-src": "gascity-src",
         "nixpkgs": "nixpkgs"
       }
     }
