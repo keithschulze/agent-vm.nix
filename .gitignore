@@ -1,5 +1,6 @@
 # Gas Town runtime
 .gt/
+.gc/
 .beads/
 .claude/
 .runtime/

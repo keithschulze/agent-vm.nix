@@ -23,31 +23,63 @@
       system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
+        gcLib = gastown-nix.lib;
+        gcPackage = gastown-nix.packages.${system}.gc;
 
-        rig = gastown-nix.lib.mkRig {
+        packToml = gcLib.mkPack {
           inherit pkgs;
-          gcPackage = gastown-nix.packages.${system}.gc;
           config = {
             name = "my-project";
-            path = ".";
-            gitUrl = "git@github.com:org/project.git";
+            agents = {
+              mayor = {
+                scope = "town";
+                provider = "claude";
+                maxConcurrent = 1;
+              };
+              witness = {
+                scope = "rig";
+                provider = "claude";
+                maxConcurrent = 1;
+              };
+              polecat = {
+                scope = "rig";
+                provider = "claude";
+                maxConcurrent = 10;
+              };
+            };
+          };
+        };
+
+        city = gcLib.mkCity {
+          inherit pkgs gcPackage packToml;
+          config = {
+            workspace.name = "my-project";
+            rigs.my-project = {
+              path = ".";
+              gitUrl = "git@github.com:org/project.git";
+            };
           };
         };
       in
       {
-        apps.mayorAttach = {
+        apps.up = {
           type = "app";
-          program = "${rig.mayorAttach}/bin/gt-mayor-attach";
+          program = "${city.gcUp}/bin/gc-up";
         };
 
-        apps.test = {
+        apps.down = {
           type = "app";
-          program = "${rig.test}/bin/gt-test-rig";
+          program = "${city.gcDown}/bin/gc-down";
+        };
+
+        apps.attach = {
+          type = "app";
+          program = "${city.gcAttach}/bin/gc-attach";
         };
 
         devShells.default = pkgs.mkShell {
           buildInputs = [
-            gastown-nix.packages.${system}.gc
+            gcPackage
             pkgs.dolt
           ];
         };
