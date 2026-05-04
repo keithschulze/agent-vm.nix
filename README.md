@@ -1,10 +1,10 @@
 # gastown.nix
 
-__WARNING: This is vibe coded using [gastown](https://github.com/gastownhall/gastown) for my own learning. IT'S NOT FUNCTIONAL, DO NOT USE.__
+__WARNING: This is vibe coded using [gascity](https://github.com/gastownhall/gascity) for my own learning. IT'S NOT FUNCTIONAL, DO NOT USE.__
 
-An embedded, declarative Gas Town rig and crew configuration using the Nix module system.
-
-This is __not__ how Gas Town is supposed to be used. Gas Town's philosophy is to manage many projects (rigs), so this goes squarely against that. As a result, there's a lot of Gas Town functionality that isn't relevant here. A lot is useful though. Once we've learnt what's useful, we can simplify.  
+Declarative Gas Town configuration using the Nix module system. Configuration is
+split into two layers: a **pack** (agent definitions) and a **city** (runtime
+workspace settings including rigs, sessions, and lifecycle scripts).
 
 ## Usage
 
@@ -12,9 +12,9 @@ __WARNING: You appear to have IGNORED my previous warning. DO NOT PROCEED any fu
 
 __WARNING: Absolute folly. This is your last and final warning: DO NOT USE THIS!__
 
-Add `gastown.nix` as a flake input and use `lib.mkRig` to embed a Gas Town rig
-directly inside your project flake. This is the recommended pattern for
-single-rig setups where the project itself hosts the configuration.
+Add `gastown.nix` as a flake input and use `lib.mkPack` + `lib.mkCity` to
+declare your agent pack and city configuration. This generates `pack.toml` and
+`city.toml` along with lifecycle scripts (`gcUp`, `gcDown`, `gcAttach`).
 
 ```nix
 {
@@ -23,80 +23,140 @@ single-rig setups where the project itself hosts the configuration.
     gastown-nix.url = "github:keithschulze/gastown.nix";
   };
 
-  outputs = { nixpkgs, gastown-nix, ... }:
+  outputs = { self, nixpkgs, gastown-nix, ... }:
   let
     pkgs = nixpkgs.legacyPackages.x86_64-linux;
+    gcLib = gastown-nix.lib;
+    gcPackage = gastown-nix.packages.x86_64-linux.gc;
 
-    rig = gastown-nix.lib.mkRig {
+    # 1. Define the agent pack (produces pack.toml)
+    packToml = gcLib.mkPack {
       inherit pkgs;
-      gtPackage = gastown-nix.packages.x86_64-linux.gt;
-      bdPackage = gastown-nix.packages.x86_64-linux.bd;  # optional
       config = {
         name = "my-project";
-        path = ".";
-        gitUrl = "git@github.com:org/project.git";
+        agents = {
+          mayor   = { scope = "town"; maxConcurrent = 1; };
+          witness = { scope = "rig";  maxConcurrent = 1; };
+          polecat = { scope = "rig";  maxConcurrent = 10; };
+        };
+      };
+    };
+
+    # 2. Define the city (produces city.toml + lifecycle scripts)
+    city = gcLib.mkCity {
+      inherit pkgs gcPackage packToml;
+      config = {
+        workspace.name = "my-project";
+        rigs.my-project = {
+          path = ".";
+          gitUrl = "git@github.com:org/project.git";
+        };
       };
     };
   in {
-    # rig.config       - evaluated configuration
-    # rig.rigConfig    - rig config.json derivation
-    # rig.configDir    - combined directory tree
-    # rig.mayorAttach  - script to manage full GT lifecycle (up/attach/down)
-    apps.mayorAttach = {
+    # city.cityToml  - city.toml derivation
+    # city.gcUp      - script: install configs, gc init, gc up
+    # city.gcDown    - script: gc down
+    # city.gcAttach  - script: gc mayor attach
+    apps.up = {
       type = "app";
-      program = "${rig.mayorAttach}/bin/gt-mayor-attach";
+      program = "${city.gcUp}/bin/gc-up";
+    };
+    apps.down = {
+      type = "app";
+      program = "${city.gcDown}/bin/gc-down";
+    };
+    apps.attach = {
+      type = "app";
+      program = "${city.gcAttach}/bin/gc-attach";
     };
   };
 }
 ```
 
-`mkRig` accepts:
+### `mkPack`
+
+Generates a `pack.toml` derivation describing the agent pack.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `pkgs` | nixpkgs | yes | Nixpkgs package set |
-| `gtPackage` | derivation | yes | `gt` CLI package |
-| `bdPackage` | derivation | no | `bd` CLI package |
 | `modules` | list | no | Extra NixOS-style modules |
-| `config` | attrset | no | Inline configuration |
+| `config` | attrset | no | Inline pack configuration |
 
-`mayorAttach` manages the full Gas Town lifecycle in a single command:
+### `mkCity`
 
-1. Discovers the project root via `git rev-parse`
-2. Writes generated configs into `.gt/`
-3. Runs `gt install` to initialize the GT directory structure
-4. Runs `gt up` to start all services (Dolt, daemon, agents, etc.)
-5. Runs `gt mayor attach` (blocks until detach with Ctrl-B D)
-6. Runs `gt down` on exit to tear down all services
+Generates `city.toml` and lifecycle scripts (`gcUp`, `gcDown`, `gcAttach`).
 
-A trap ensures `gt down` runs even on unexpected exit.
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `pkgs` | nixpkgs | yes | Nixpkgs package set |
+| `gcPackage` | derivation | yes | `gc` CLI package |
+| `packToml` | derivation | yes | Pack TOML from `mkPack` |
+| `modules` | list | no | Extra NixOS-style modules |
+| `config` | attrset | no | Inline city configuration |
+
+The lifecycle scripts manage the full Gas Town lifecycle:
+
+- **`gcUp`** — installs `pack.toml` and `city.toml` into `.gt/`, runs `gc init`, then `gc up`
+- **`gcDown`** — runs `gc down` to tear down all services
+- **`gcAttach`** — runs `gc mayor attach` (blocks until detach)
 
 ## Pure evaluation
 
-Use `evalRig` when you only need the evaluated config without derivations:
+Use `evalPack` or `evalCity` when you only need the evaluated config without
+derivations (no `pkgs` required):
 
 ```nix
-cfg = gastown-nix.lib.evalRig {
+packCfg = gastown-nix.lib.evalPack {
   config = {
     name = "my-project";
-    path = ".";
-    gitUrl = "git@github.com:org/project.git";
+    agents.polecat = { scope = "rig"; maxConcurrent = 5; };
   };
 };
-# cfg.name         => "my-project"
-# cfg.path         => "."
-# cfg.defaultBranch => "main"
+# packCfg.name                    => "my-project"
+# packCfg.agents.polecat.scope    => "rig"
+
+cityCfg = gastown-nix.lib.evalCity {
+  config = {
+    workspace.name = "my-project";
+    rigs.my-project = {
+      path = ".";
+      gitUrl = "git@github.com:org/project.git";
+    };
+  };
+};
+# cityCfg.workspace.name             => "my-project"
+# cityCfg.rigs.my-project.path       => "."
+# cityCfg.rigs.my-project.defaultBranch => "main"
 ```
 
-## Rig options
+## Pack options
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `name` | string | *required* | Rig name, used as the directory under GT_ROOT |
-| `path` | string | *required* | Filesystem path to the rig's working directory |
-| `gitUrl` | string | *required* | Git URL for the rig's repository |
-| `defaultBranch` | string | `"main"` | Default branch name |
-| `defaultAgent` | string | `"claude"` | Default agent type |
+| `name` | string | *required* | Pack name identifier |
+| `schema` | int | `1` | Schema version for the pack definition |
+| `agents.<name>.scope` | string | *required* | Agent scope (`"town"`, `"rig"`, `"project"`) |
+| `agents.<name>.provider` | string | `"claude"` | AI provider for this agent |
+| `agents.<name>.maxConcurrent` | int | `1` | Maximum concurrent instances |
+
+## City options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `workspace.name` | string | *required* | City/workspace name |
+| `workspace.provider` | string | `"local"` | Workspace provider backend |
+| `session.provider` | string | `"tmux"` | Session multiplexer provider |
+| `session.concurrentPerAgent` | int | `1` | Max concurrent sessions per agent |
+| `beads.provider` | string | `"dolt"` | Beads storage provider |
+| `beads.prefix` | string | `"hq"` | Bead ID prefix for city-level beads |
+| `daemon.patrolInterval` | string | `"30s"` | Agent health check interval |
+| `daemon.maxRestarts` | int | `3` | Max automatic restarts per agent |
+| `daemon.shutdownTimeout` | string | `"60s"` | Grace period before force-killing agents |
+| `rigs.<name>.path` | string | *required* | Filesystem path to the rig's working directory |
+| `rigs.<name>.gitUrl` | string | *required* | Git URL for the rig's repository |
+| `rigs.<name>.defaultBranch` | string | `"main"` | Default branch name |
 
 ## Running checks
 
