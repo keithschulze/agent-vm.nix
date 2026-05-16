@@ -7,6 +7,7 @@
   # the VM runner and packages respectively.
   mkAgentVM =
     { nixpkgs ? inputs.nixpkgs
+    , hostPkgs
     , system
     , hostname ? "agent-vm"
     , username ? "agent"
@@ -40,6 +41,7 @@
           // lib.optionalAttrs (volumes != null) { inherit volumes; }
           // lib.optionalAttrs (interfaces != null) { inherit interfaces; };
         })
+        { microvm.vmHostPackages = hostPkgs; }
       ] ++ extraModules;
     };
 }
