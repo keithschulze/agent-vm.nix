@@ -23,9 +23,12 @@ checking everything resolves:
 nix run github:keithschulze/agent-vm.nix#vm
 ```
 
-On first run microvm.nix creates a writable nix-store overlay image in the
-current working directory and boots the guest. Log in is automatic
-(`agent` / `agent`).
+On first run microvm.nix creates a writable nix-store overlay image
+(`nix-store-overlay.img`, sparse, sized 16 GiB) in the current working
+directory and boots the guest. Login is automatic to user `agent`
+(password also `agent` if you need it elsewhere; sudo is passwordless for
+`wheel`). Inside the guest, `claude-code` and `br` (beads-rust) are on
+the PATH.
 
 ## Using it in your own flake
 
@@ -96,7 +99,7 @@ for the runnable derivation.
 
 ## What ships inside the VM
 
-- `claude-code`, `beads-rust` from `llm-agents.nix`
+- `claude-code` (binary: `claude`) and `beads-rust` (binary: `br`) from `llm-agents.nix`
 - `git`, `gnupg`, `openssh`
 - `jq`, `ripgrep`, `fzf`, `htop`, `lsof`, `helix`
 - zsh as the login shell

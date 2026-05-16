@@ -38,7 +38,10 @@ in
     networking.hostName = cfg.hostname;
     system.stateVersion = lib.mkDefault "25.11";
 
-    users.mutableUsers = false;
+    # Keep users.mutableUsers at its default (true) so initialPassword applies.
+    # With mutableUsers=false the option is silently ignored and the account
+    # has no password set, which breaks any non-autologin entry path (ssh,
+    # secondary tty, login from console).
     users.groups.${cfg.username}.gid = cfg.uid;
     users.users.${cfg.username} = {
       isNormalUser = true;
@@ -46,7 +49,7 @@ in
       group = cfg.username;
       home = "/home/${cfg.username}";
       shell = pkgs.zsh;
-      initialPassword = "agent";
+      initialPassword = cfg.username;
       extraGroups = [ "wheel" ];
     };
 

@@ -35,24 +35,11 @@
           };
           microvm = {
             inherit hypervisor vcpu mem;
-          } // (if shares == [ ] then { } else { inherit shares; })
-            // (lib.optionalAttrs (volumes != null) { inherit volumes; })
-            // (lib.optionalAttrs (interfaces != null) { inherit interfaces; });
+          }
+          // lib.optionalAttrs (shares != [ ]) { inherit shares; }
+          // lib.optionalAttrs (volumes != null) { inherit volumes; }
+          // lib.optionalAttrs (interfaces != null) { inherit interfaces; };
         })
       ] ++ extraModules;
-    };
-
-  # Convenience: build a virtiofs share entry. Use this when composing the
-  # `shares` list passed to mkAgentVM.
-  mkShare =
-    { source
-    , mountPoint
-    , tag ? null
-    , proto ? "virtiofs"
-    }:
-    {
-      inherit source mountPoint proto;
-      tag = if tag != null then tag
-            else builtins.substring 0 20 (builtins.hashString "sha256" mountPoint);
     };
 }
